@@ -6,6 +6,17 @@ constexpr int butAmount = sizeof(but)/sizeof(but[0]);
 
 constexpr int debouncing = 20; //ms
 
+// 7-segs
+constexpr int latch_pin = 4;
+constexpr int clock_pin = 7;
+constexpr int data_pin = 8;
+
+constexpr int glyphDigit[]
+{ 0xc0, 0xf9, 0xa4, 0xB0, 0b10011001, 
+  0x92, 0x82, 0xf8, 0x80, 0x90
+};
+
+
 
 /*bool nowGoingLeft = true; //for bounce() function
 int bounce(int lastState, int period){
@@ -20,6 +31,16 @@ int bounce(int lastState, int period){
   }
   return lastState;
 }*/
+
+class Debug{
+  public:
+  Debug(bool en){
+    enabled_ = en;
+  }
+  void out(){}
+  private:
+  bool enabled_;
+};
 
 class LED{
   private:
@@ -99,6 +120,19 @@ class Timer {
   unsigned long last_time_ = 0;
   unsigned long last_time_holding_true_ = 0;
   bool was_true_before_ = false;
+};
+
+class Cislice{
+  public:
+  void writeGlyphBitmask( byte glyph, byte pos_bitmask) {
+    digitalWrite( latch_pin, LOW);
+    shiftOut( data_pin, clock_pin, MSBFIRST, glyph);
+    shiftOut( data_pin, clock_pin, MSBFIRST, pos_bitmask);
+    digitalWrite( latch_pin, HIGH);
+  }
+  void writeGlyph(byte glyph, int pos){
+    writeGlyphBitmask(glyph, 0x08 >> pos);
+  }
 };
 
 /*class Buttons{
@@ -215,6 +249,10 @@ class CounterButtons{
   int counter;
   SmartButton up;
   SmartButton down;
+
+  int buttonDifference(){
+    return  up.handleButton() - down.handleButton();
+  }
   public:
   CounterButtons(){
     counter = 0;
@@ -223,16 +261,28 @@ class CounterButtons{
   }
 
   int Count(){
-    counter += up.handleButton();
-    counter -= down.handleButton();
+    counter += buttonDifference();
+    return counter;
+  }
+  
+  int Count(int multiplier, int max){
+    counter += buttonDifference();
+    if (counter < 0){
+      counter = max - 1;
+    }
+    counter = counter % max;
     return counter;
   }
 };
 
 LED output[ledAmount];
-CounterButtons counting;
+Timer tim;
+Cislice cislice;
+CounterButtons cnt;
+
 
 void setup() {
+  Serial.begin( 9600);
   for (int i = 0; i < ledAmount; i++){
     output[i].setPin(ledAmount - i - 1);
   }
@@ -242,14 +292,22 @@ void setup() {
   for (int i = 0; i < ledAmount; ++i){
     pinMode(led[i], OUTPUT);
   }
+
+  pinMode(latch_pin, OUTPUT);
+  pinMode(clock_pin, OUTPUT);
+  pinMode(data_pin, OUTPUT);
+
 }
 
+
+
 void loop() {
-  int count = counting.Count();
-  for (int i = 0; i < ledAmount; i++){
-    output[i].set_led(count >> i & 1);
+  int counter = cnt.Count(1, 10);
+  cislice.writeGlyph(glyphDigit[counter%10], 0);
+  if (tim.notBlockingDelay(200)){
+    Serial.println(counter%10);
   }
-  output[0:ledAmount-1].
+
 }
 /**
 * v konstruktorech nevolat knihovni funkce co komunikuji s arduinem - to by se zavolalo, jeste nez se program spustil.
