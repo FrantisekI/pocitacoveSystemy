@@ -7,15 +7,20 @@ constexpr int butAmount = sizeof(but)/sizeof(but[0]);
 constexpr int debouncing = 20; //ms
 
 // 7-segs
-constexpr int latch_pin = 4;
+constexpr int latch_pin = 14;
 constexpr int clock_pin = 7;
 constexpr int data_pin = 8;
 
-constexpr int glyphDigit[]
-{ 0xc0, 0xf9, 0xa4, 0xB0, 0b99, 
+constexpr byte glyphDigit[]
+{ 0xc0, 0xf9, 0xa4, 0xb0, 0x99, 
   0x92, 0x82, 0xf8, 0x80, 0x90
 };
 constexpr int displayAmount = 4;
+constexpr int pinChangePositionOfDigit = 2;
+constexpr int pinCountUp = 0;
+constexpr int pinCountDown = 1;
+constexpr int baseWhat = 10;
+
 
 
 
@@ -32,6 +37,13 @@ int bounce(int lastState, int period){
   }
   return lastState;
 }*/
+int pow(int x, int y){
+  int result = 1; 
+  for (int i = 0; i < y; i++){
+    result = result * x;
+  }
+  return result;
+}
 
 class Debug{
   public:
@@ -123,7 +135,7 @@ class Timer {
   bool was_true_before_ = false;
 };
 
-class Cislice{
+class Digit{
   public:
   void writeGlyphBitmask( byte glyph, byte pos_bitmask) {
     digitalWrite( latch_pin, LOW);
@@ -133,6 +145,9 @@ class Cislice{
   }
   void writeGlyph(byte glyph, int pos){
     writeGlyphBitmask(glyph, 0x08 >> pos);
+  }
+  void writeDigit(int number, int pos){
+    writeGlyph(glyphDigit[number], pos);
   }
 };
 
@@ -173,6 +188,7 @@ class Button{
   }
   void setPin(int which){
     pin = but[which];
+    lastState = false;
   }
 
   bool Pressed(){
@@ -257,8 +273,8 @@ class CounterButtons{
   public:
   CounterButtons(){
     counter = 0;
-    up.setHwButton(0);
-    down.setHwButton(1);
+    up.setHwButton(pinCountUp);
+    down.setHwButton(pinCountDown);
   }
 
   int Count(){
@@ -267,19 +283,48 @@ class CounterButtons{
   }
   
   int Count(int multiplier, int max){
-    counter += buttonDifference();
+    counter +=  multiplier * buttonDifference();
     if (counter < 0){
-      counter = max - 1;
+      counter = max + counter;
     }
     counter = counter % max;
     return counter;
   }
 };
 
+class CouterDisplay{
+  private:
+  Digit digit;
+  CounterButtons cnt;
+  Button changePosB;
+  int counter;
+  int max;
+  int position;
+
+  public:
+  CouterDisplay(){
+    changePosB.setPin(pinChangePositionOfDigit);
+    max = pow(baseWhat, displayAmount);
+    position = 0;
+    counter = 0;
+  }
+  void display(){
+    int whatToDisplay = (counter % pow(baseWhat, (position + 1))) / pow(baseWhat, (position));
+    digit.writeDigit(whatToDisplay, position);
+  }
+  void handleInput(){
+    counter = cnt.Count(pow(baseWhat, position), max);
+    if (changePosB.RisingEdge()){
+      position = (position + 1) % displayAmount;
+    }
+  }
+};
+
 LED output[ledAmount];
 Timer tim;
-Cislice cislice;
-CounterButtons cnt;
+CouterDisplay counterDisplay;
+//Digit digit;
+//CounterButtons cnt;
 
 
 void setup() {
@@ -303,12 +348,10 @@ void setup() {
 
 
 void loop() {
-  int counter = cnt.Count(1, 10);
-  cislice.writeGlyph(glyphDigit[counter%10], 0);
-  if (tim.notBlockingDelay(200)){
-    Serial.println(counter%10);
-  }
-
+  //int counter = cnt.Count(1, baseWhat);
+  //digit.writeGlyph(glyphDigit[counter%baseWhat], 0);
+  counterDisplay.handleInput();
+  counterDisplay.display();
 }
 /**
 * v konstruktorech nevolat knihovni funkce co komunikuji s arduinem - to by se zavolalo, jeste nez se program spustil.
