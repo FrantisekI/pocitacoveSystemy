@@ -1,5 +1,3 @@
-constexpr bool doYouWantToDebug = false;
-
 constexpr int led[] {13, 12, 11, 10};
 constexpr int ledAmount = sizeof(led)/sizeof(led[0]);
 
@@ -7,35 +5,45 @@ constexpr int but[] {A1, A2, A3};
 constexpr int butAmount = sizeof(but)/sizeof(but[0]);
 
 constexpr int debouncing = 20; //ms
-
+/*
 // 7-segs
-/*constexpr int latch_pin = 4;
+constexpr int latch_pin = 4;
 constexpr int clock_pin = 7;
-constexpr int data_pin = 8;*/
-
+constexpr int data_pin = 8;
+*/
 constexpr byte glyphDigit[]
 { 0xc0, 0xf9, 0xa4, 0xb0, 0x99, 
   0x92, 0x82, 0xf8, 0x80, 0x90
 };
-constexpr byte displayBlack = 0xFF;
 constexpr int displayAmount = 4;
 constexpr int pinChangePositionOfDigit = 2;
 constexpr int pinCountUp = 0;
 constexpr int pinCountDown = 1;
 constexpr int baseWhat = 10;
 
-constexpr int decimalPlaces = 1;
+
+
+
+/*bool nowGoingLeft = true; //for bounce() function
+int bounce(int lastState, int period){
+  if (nowGoingLeft){
+    lastState++;
+  }
+  else{
+    lastState--;
+  }
+  if (lastState == period - 1 || lastState == 0){
+    nowGoingLeft = !nowGoingLeft;
+  }
+  return lastState;
+}*/
 
 class Debug{
   public:
-  Debug(){
-    enabled_ = doYouWantToDebug;
+  Debug(bool en){
+    enabled_ = en;
   }
-  void out(byte variable){
-    if (enabled_){
-      Serial.println(variable);
-    }
-  }
+  void out(){}
   private:
   bool enabled_;
 };
@@ -66,7 +74,7 @@ class LED{
   }
 };
 
-class LEDs{
+/*class LEDs{
   public:
   void set_led(int which, bool toOn){
     if (toOn){
@@ -88,7 +96,7 @@ class LEDs{
     }
   }
 
-};
+};*/
 
 class Timer {
   public:
@@ -114,26 +122,10 @@ class Timer {
     }
     return false;
   }
-  void timer_reset(){
-    timer_ = millis();
-  }
-  unsigned long timer_get(){
-    return lap_ + millis() - timer_;
-  }
-  void timer_remember(){
-    lap_ = timer_get();
-    timer_reset();
-  }
-  void timer_forget(){
-    lap_ = 0;
-    timer_reset();
-  }
   private:
   unsigned long last_time_ = 0;
   unsigned long last_time_holding_true_ = 0;
   bool was_true_before_ = false;
-  unsigned long timer_ = 0;
-  unsigned long lap_ = 0;
 };
 
 class Digit{
@@ -219,63 +211,6 @@ class Button{
   private:
   bool lastState;
   int pin;
-};
-
-class ButtonsInterface{
-  /**
-  * is ment to create a mask of which buttons was pressed/hold based on previous setup
-  * but it might cause preformence issues
-  */
-  private:
-  Debug cc;
-  Button buttons[butAmount];
-  enum ReactType {
-    RISE,
-    FALL,
-    HOLD
-  };
-  ReactType reactions[butAmount];
-  public:
-  ButtonsInterface(){
-    setHowWillReact(RISE);
-  }
-  void createButtons(){
-    for (int i = 0; i < butAmount; i++){
-      buttons[i].setPin(i);
-    }
-  }
-  void setHowWillReact(ReactType buttonReactions[butAmount]){
-    for (int i = 0; i < butAmount; i++){
-      reactions[i] = buttonReactions[i];
-    }
-  }
-  void setHowWillReact(ReactType buttonReaction){
-    for (int i = 0; i < butAmount; i++){
-      reactions[i] = buttonReaction;
-    }
-  }
-  byte getMask(){
-    byte result = 0;
-    bool logicValue = 0;
-    for (int i = 0; i < butAmount; i++){
-      switch (reactions[i]){
-        case RISE:
-          logicValue = buttons[i].RisingEdge();
-          break;
-        case FALL:
-          logicValue = buttons[i].FallingEdge();
-          break;
-        case HOLD:
-          logicValue = buttons[i].Pressed();
-          break;
-      }
-      byte shifted = (byte)logicValue << i;
-      cc.out(shifted);
-      result = result | shifted;
-    }
-    return result;
-  }
-
 };
 
 class SmartButton{
@@ -387,156 +322,40 @@ class CouterDisplay{
       }
     }
   }
-  int getCounter(){
-    return counter;
-  }
-};
-
-class Display{
-  private:
-  int pos;
-  byte data[displayAmount];
-  Digit digit;
-  bool leadingZeros;
-  int smallestToDisplay;
-  public:
-  Display(){
-    pos = 0;
-    leadingZeros = false;
-    smallestToDisplay = 0;
-  }
-  
-  void set( int n, byte maskForDots ){
-    for (int i = 0; i < displayAmount; i++){
-      byte dot = (maskForDots % 2) << 7 ^ 0xFF;
-      
-      //dot = dot ^ 0xff;
-      maskForDots /= 2;
-      int index = n % baseWhat;
-      
-      if (n == 0 && i > smallestToDisplay && !leadingZeros){
-        data[i] = displayBlack & dot;
-      }
-      else{
-        data[i] = glyphDigit[index] & dot;
-      }
-      n = n / baseWhat;
-    }
-  }
-  void loop(){
-    digit.writeGlyph(data[pos], pos);
-    pos++;
-    if (pos >= displayAmount){
-      pos = 0;
-    }
-  }
-  void showLeadingZeros(bool show, int lastToAlwaysDisplay){
-    leadingZeros = show;
-    smallestToDisplay = lastToAlwaysDisplay;
-  }
-};
-
-class StopWatch{
-  private:
-  //v zadani je stejne zadano jake cislo tlacitka dela co, takze masky pro tlacitka je podle ne uplne validni
-  byte bRun = 0b1; //button from stopped to running
-  byte bLap = 0b10; //button from running to lapped
-  byte bRes = 0b100; //button to reset timer 
-  Timer tim;
-  int millisPerUnit;
-  int timeToDisplay;
-  enum State {
-    STOP,
-    RUNN,
-    LAPP
-  };
-  State stateNow;
-  public:
-  StopWatch(){
-    millisPerUnit = 1;
-    for (int i =0; i < 3 - decimalPlaces; i++){
-      millisPerUnit *= baseWhat;
-    }
-    stateNow = STOP;
-  }
-  void handleStateCange(byte buttonValues){
-    switch (stateNow){
-      case STOP:
-        stopped(buttonValues);
-        break;
-      case RUNN:
-        running(buttonValues);
-        break;
-      case LAPP:
-        lapped(buttonValues);
-        break;
-    }
-  }
-  void stopped(byte but){
-    if ((but & bRes) == bRes){
-      timeToDisplay = 0;
-      tim.timer_forget();
-    }
-    if ((but & bRun) == bRun){
-      stateNow = RUNN;
-      tim.timer_reset();
-    }
-  }
-  void running(byte but){
-    timeToDisplay = tim.timer_get() / millisPerUnit;
-    if ((but & bRun) == bRun){
-      stateNow = STOP;
-      tim.timer_remember();
-    }
-    else if((but & bLap) == bLap){
-      stateNow = LAPP;
-    }
-  }
-  void lapped(byte but){
-    if((but & bLap) == bLap){
-      stateNow = RUNN;
-    }
-  }
-  int read(){
-    return timeToDisplay;
-  }
 };
 
 LED output[ledAmount];
 Timer tim;
 CouterDisplay counterDisplay;
-Display displayAll;
-ButtonsInterface butMask;
-StopWatch stopwatch;
 //Digit digit;
 //CounterButtons cnt;
 
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin( 9600);
+  for (int i = 0; i < ledAmount; i++){
+    output[i].setPin(ledAmount - i - 1);
+  }
   for (int i = 0; i < butAmount; ++i){
     pinMode(but[i], INPUT);
   }
   for (int i = 0; i < ledAmount; ++i){
     pinMode(led[i], OUTPUT);
   }
+
   pinMode(latch_pin, OUTPUT);
   pinMode(clock_pin, OUTPUT);
   pinMode(data_pin, OUTPUT);
-  for (int i = 0; i < ledAmount; i++){
-    output[i].setPin(ledAmount - i - 1);
-    output[i].set_led(false);
-  }
-  displayAll.showLeadingZeros(false, decimalPlaces);
-  butMask.createButtons();
+
 }
+
+
+
 void loop() {
   //int counter = cnt.Count(1, baseWhat);
   //digit.writeGlyph(glyphDigit[counter%baseWhat], 0);
-  stopwatch.handleStateCange(butMask.getMask());
-  //counterDisplay.display();
-  displayAll.set(stopwatch.read(), 1 << decimalPlaces);
-  displayAll.loop();
+  counterDisplay.handleInput();
+  counterDisplay.display();
 }
 /**
 * v konstruktorech nevolat knihovni funkce co komunikuji s arduinem - to by se zavolalo, jeste nez se program spustil.
