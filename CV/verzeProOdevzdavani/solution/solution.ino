@@ -1,52 +1,72 @@
-constexpr int led[] {13, 12, 11, 10};
+#include "funshield.h"
+constexpr bool doYouWantToDebug = false;
+
+constexpr int led[] {led1_pin, led2_pin, led3_pin, led4_pin};
+
 constexpr int ledAmount = sizeof(led)/sizeof(led[0]);
 
-constexpr int but[] {A1, A2, A3};
+constexpr int but[] {button1_pin, button2_pin, button3_pin};
+
+
 constexpr int butAmount = sizeof(but)/sizeof(but[0]);
 
 constexpr int debouncing = 20; //ms
-/*
-// 7-segs
-constexpr int latch_pin = 4;
-constexpr int clock_pin = 7;
-constexpr int data_pin = 8;
-*/
-constexpr byte glyphDigit[]
-{ 0xc0, 0xf9, 0xa4, 0xb0, 0x99, 
-  0x92, 0x82, 0xf8, 0x80, 0x90
+
+constexpr byte LETTER_GLYPH[] {
+  0b10001000,   // A
+  0b10000011,   // b
+  0b11000110,   // C
+  0b10100001,   // d
+  0b10000110,   // E
+  0b10001110,   // F
+  0b10000010,   // G
+  0b10001001,   // H
+  0b11111001,   // I
+  0b11100001,   // J
+  0b10000101,   // K
+  0b11000111,   // L
+  0b11001000,   // M
+  0b10101011,   // n
+  0b10100011,   // o
+  0b10001100,   // P
+  0b10011000,   // q
+  0b10101111,   // r
+  0b10010010,   // S
+  0b10000111,   // t
+  0b11000001,   // U
+  0b11100011,   // v
+  0b10000001,   // W
+  0b10110110,   // ksi
+  0b10010001,   // Y
+  0b10100100,   // Z
 };
+constexpr int letterAmount = sizeof(LETTER_GLYPH)/sizeof(LETTER_GLYPH[0]);
+
+constexpr byte displayBlack = 0xFF;
 constexpr int displayAmount = 4;
-constexpr int pinChangePositionOfDigit = 2;
+
 constexpr int pinCountUp = 0;
-constexpr int pinCountDown = 1;
+constexpr int pinChangePositionOfDigit = 1;
+constexpr int pinEvaluate = 2;
+
 constexpr int baseWhat = 10;
+constexpr int displayStartPos = 0x08;
 
+constexpr int decimalDotPosition = 7;
+constexpr int milisecInSecond = 1000;
 
+constexpr int notValidNumForCounting = -1;
+constexpr int timeHoldButtonCount = 1000;
+constexpr int countInterval = 300;
 
+constexpr int ConDecimalPlaces = 1;
 
-/*bool nowGoingLeft = true; //for bounce() function
-int bounce(int lastState, int period){
-  if (nowGoingLeft){
-    lastState++;
-  }
-  else{
-    lastState--;
-  }
-  if (lastState == period - 1 || lastState == 0){
-    nowGoingLeft = !nowGoingLeft;
-  }
-  return lastState;
-}*/
+constexpr int waitBeforeShow = 1; //in seconds
+constexpr int timeToShow = 2;
+constexpr int maxRndNumber = 10000;
+constexpr int minLevel = 1;
+constexpr int maxLevel = 15;
 
-class Debug{
-  public:
-  Debug(bool en){
-    enabled_ = en;
-  }
-  void out(){}
-  private:
-  bool enabled_;
-};
 
 class LED{
   private:
@@ -74,7 +94,7 @@ class LED{
   }
 };
 
-/*class LEDs{
+class LEDs{
   public:
   void set_led(int which, bool toOn){
     if (toOn){
@@ -87,27 +107,26 @@ class LED{
   void set_led_by_binary_number(int leds){
     for (int i = 0; i < ledAmount; ++i){
       int shifted = (leds >> i) & 1;
-      set_led(ledAmount - 1 - i, shifted == 1);
-    }
-  }
-  void set_exact_led(int ledNum){
-    for (int i = 0; i < ledAmount; ++i){
-      set_led(i, i == ledNum);
+      set_led(i, shifted == 1);
     }
   }
 
-};*/
+};
 
 class Timer {
   public:
   bool notBlockingDelay(unsigned long interval){
-    auto now = millis();
+    unsigned long now = millis();
+
     if (now >= last_time_ + interval){
       last_time_ += interval;
       return true;
     }
     return false;
-  } 
+  }
+  void reset_delay(){
+    last_time_ = millis();
+  }
 
   bool isItTrueFor(unsigned long interval, bool whatShould){
     auto now = millis();
@@ -122,6 +141,7 @@ class Timer {
     }
     return false;
   }
+
   private:
   unsigned long last_time_ = 0;
   unsigned long last_time_holding_true_ = 0;
@@ -137,52 +157,27 @@ class Digit{
     digitalWrite( latch_pin, HIGH);
   }
   void writeGlyph(byte glyph, int pos){
-    writeGlyphBitmask(glyph, 0x08 >> pos);
+    writeGlyphBitmask(glyph, displayStartPos >> pos);
   }
   void writeDigit(int number, int pos){
-    writeGlyph(glyphDigit[number], pos);
+    writeGlyph(digits[number], pos);
+  }
+  void writeLetter(char letter, int pos){
+    writeGlyph(LETTER_GLYPH[letter - (isUpperCase(letter) ? 'A' : 'a') ], pos);
   }
 };
-
-/*class Buttons{
-  public:
-  void initButtons(){
-    for (int i = 0; i < butAmount; ++i){
-      pinMode(but[i], OUTPUT);
-    }
-  }
-
-  bool isPressed(int button){
-    return !digitalRead(but[button]);
-  }
-
-  bool wasJustPressed(int button){
-    bool pressed = isPressed(button);
-    if (pressed && !lastState[button]){
-      lastState[button] = true;
-      return true;
-    }
-    lastState[button] = pressed;
-    return false;
-  }
-  private:
-  bool lastState[butAmount];
-};*/
 
 class Button{
   public:
   Button(int which){
-    pin = but[which];
+    pin = which;
     lastState = false;
   }
   Button(){
     pin = but[0];
     lastState = false;
   }
-  void setPin(int which){
-    pin = but[which];
-    lastState = false;
-  }
+
 
   bool Pressed(){
     return !digitalRead(pin);
@@ -213,36 +208,32 @@ class Button{
   int pin;
 };
 
-class SmartButton{
+class SmartButton : Button{
   private:
   enum States {
     PRESS,
     HOLD
   };
   enum States state;
-  Button button;
   Timer tim;
 
   public:
-  SmartButton(){
+  SmartButton(int id){
     state = PRESS;
-  }
-  void setHwButton(int id){
-    button.setPin(id);
   }
 
   int handleButton(){
     if (state == PRESS){
-      if (button.RisingEdge()){
+      if (RisingEdge()){
         return 1;
-      } else if (tim.isItTrueFor(1000, button.Pressed())){
+      } else if (tim.isItTrueFor(timeHoldButtonCount, Pressed())){
         state = HOLD;
         return 1;
       }
     }
     else{
-      if (button.Pressed()){
-        if (tim.notBlockingDelay(300)){
+      if (Pressed()){
+        if (tim.notBlockingDelay(countInterval)){
           return 1;
         }
       }
@@ -254,20 +245,31 @@ class SmartButton{
   }
 };
 
-class CounterButtons{
+class Counter{
   private:
+  Button changePosB = (but[pinChangePositionOfDigit]);
   int counter;
-  SmartButton up;
-  SmartButton down;
+  int max;
+  int position;
+  int posExpBase;
+
+  SmartButton up = (but[pinCountUp]);
+  //SmartButton down;
 
   int buttonDifference(){
-    return  up.handleButton() - down.handleButton();
+    return  (int)up.handleButton();
   }
+
   public:
-  CounterButtons(){
+  Counter(){
+    // nevim, jak jde spocitat maximum lip a nazacatku to podle mne zas tak nevadi - cyklus probehne malokrat
+    max = baseWhat;
+    
+    position = 0;
+    posExpBase = 1;
     counter = 0;
-    up.setHwButton(pinCountUp);
-    down.setHwButton(pinCountDown);
+
+    //up.setHwButton(pinCountUp);
   }
 
   int Count(){
@@ -276,43 +278,17 @@ class CounterButtons{
   }
   
   int Count(int multiplier, int max){
-    counter +=  multiplier * buttonDifference();
-    if (counter < 0){
-      counter = max + counter;
+    int diff = buttonDifference();
+    counter +=  multiplier * diff;
+
+    if (diff != 0 && (counter % (multiplier*max)) / multiplier == 0){
+      counter -= (multiplier * max);
     }
-    counter = counter % max;
     return counter;
   }
-};
 
-class CouterDisplay{
-  private:
-  Digit digit;
-  CounterButtons cnt;
-  Button changePosB;
-  int counter;
-  int max;
-  int position;
-  int posExpBase;
-
-  public:
-  CouterDisplay(){
-    changePosB.setPin(pinChangePositionOfDigit);
-    // nevim, jak jde spocitat maximum lip a nazacatku to podle mne zas tak nevadi - cyklus probehne malokrat
-    max = 1;
-    for (int i = 0; i < displayAmount; i++){
-      max *= baseWhat;
-    }
-    position = 0;
-    posExpBase = 1;
-    counter = 0;
-  }
-  void display(){
-    int whatToDisplay = (counter % (posExpBase * baseWhat)) / posExpBase;
-    digit.writeDigit(whatToDisplay, position);
-  }
   void handleInput(){
-    counter = cnt.Count(posExpBase, max);
+    counter = Count(posExpBase, max);
     if (changePosB.RisingEdge()){
       position++;
       posExpBase *= baseWhat;
@@ -322,42 +298,176 @@ class CouterDisplay{
       }
     }
   }
+  void reset(){
+    counter = 0;
+    position = 0;
+    posExpBase = 1;
+  }
+  int getCounter(){
+    return counter;
+  }
+  int getPos(){
+    return position;
+  }
 };
 
-LED output[ledAmount];
-Timer tim;
-CouterDisplay counterDisplay;
-//Digit digit;
-//CounterButtons cnt;
+class Display{
+  private:
+  int pos;
+  byte data[displayAmount];
+  Digit digit;
+  bool leadingZeros;
+  int smallestToDisplay;
+
+  public:
+  Display(){
+    pos = 0;
+    leadingZeros = false;
+    smallestToDisplay = 0;
+  }
+  int getGlyph(int ch){
+    byte glyph = displayBlack;
+    if (isAlpha(ch)) {
+      glyph = LETTER_GLYPH[ ch - (isUpperCase(ch) ? 'A' : 'a') ];
+    }
+    return glyph;
+  }
+
+  void set( int n, byte maskForDots ){
+    for (int i = 0; i < displayAmount; i++){
+      byte dot = (maskForDots & 0b1) << decimalDotPosition ^ displayBlack;
+      
+      //dot = dot ^ 0xff;
+      maskForDots = maskForDots >> 1;
+      int index = n % baseWhat;
+      
+      if (n == 0 && i > smallestToDisplay && !leadingZeros){
+        data[i] = displayBlack & dot;
+      }
+      else{
+        data[i] = digits[index] & dot;
+      }
+      n = n / baseWhat;
+    }
+  }
+  void setBlack(){
+    for (int i = 0; i < displayAmount; i++){
+      data[i] = displayBlack;
+    }
+  }
+  void setDecimal(int n, int decPlaces){
+    smallestToDisplay = decPlaces;
+    
+    set(n, /*decPlaces == 0 ? 0b0 : */ 0b1 << decPlaces);
+  }
+  void loop(){
+    displayOne(pos);
+    pos = (pos + 1) % displayAmount;
+  }
+  void displayOne(int position){
+    digit.writeGlyph(data[position], position);
+  }
+  void showLeadingZeros(bool show, int lastToAlwaysDisplay){
+    leadingZeros = show;
+    smallestToDisplay = lastToAlwaysDisplay;
+  }
+};
+
+class MemoryGame{
+  private:
+  Display display;
+  Button evalBtn = (but[pinEvaluate]);
+  enum State {
+    STRT,
+    SHOW,
+    ENTR
+  };
+  State stateNow;
+  Timer tim;
+  Counter cnt;
+  int randomNumber;
+  int level;
+  LEDs levelShow;
+
+
+  public:
+  MemoryGame(){
+    stateNow = STRT;
+    randomNumber = 0;
+    display.showLeadingZeros(true, 0);
+    level = minLevel;
+  }
+  void play(){
+    display.loop();
+    levelShow.set_led_by_binary_number(level);
+
+    handleStateCange();
+  }
+  void handleStateCange(){
+    switch (stateNow){
+      case STRT:
+        start();
+        break;
+      case SHOW:
+        show_rnd_number();
+        break;
+      case ENTR:
+        enter_number();
+        break;
+    }
+  }
+  void start(){
+    display.setBlack();
+    if (tim.notBlockingDelay(milisecInSecond * waitBeforeShow)){
+      randomNumber = random(maxRndNumber);
+      stateNow = SHOW;
+    }
+  }
+  void show_rnd_number(){
+    display.set(randomNumber, 0);
+    if (tim.notBlockingDelay(milisecInSecond * timeToShow)){
+      stateNow = ENTR;
+      cnt.reset();
+    }
+  }
+  void enter_number(){
+    cnt.handleInput();
+    int counter = cnt.getCounter();
+    display.setDecimal(counter, cnt.getPos());
+
+    if (evalBtn.Pressed()){
+      if (counter == randomNumber){
+        level += 1;
+        if (level >= maxLevel){
+          level = minLevel;
+        }
+      }
+      else{
+        level = minLevel;
+      }
+      stateNow = STRT;
+      tim.reset_delay();
+
+    }
+  }
+};
+
+
+MemoryGame memGame;
 
 
 void setup() {
-  Serial.begin( 9600);
-  for (int i = 0; i < ledAmount; i++){
-    output[i].setPin(ledAmount - i - 1);
-  }
+  Serial.begin(9600);
   for (int i = 0; i < butAmount; ++i){
     pinMode(but[i], INPUT);
   }
   for (int i = 0; i < ledAmount; ++i){
     pinMode(led[i], OUTPUT);
   }
-
   pinMode(latch_pin, OUTPUT);
   pinMode(clock_pin, OUTPUT);
   pinMode(data_pin, OUTPUT);
-
 }
-
-
-
 void loop() {
-  //int counter = cnt.Count(1, baseWhat);
-  //digit.writeGlyph(glyphDigit[counter%baseWhat], 0);
-  counterDisplay.handleInput();
-  counterDisplay.display();
+  memGame.play();
 }
-/**
-* v konstruktorech nevolat knihovni funkce co komunikuji s arduinem - to by se zavolalo, jeste nez se program spustil.
-* nepouzivat globalni promenne
-*/
