@@ -37,3 +37,7 @@ takže (3 datové stránky + 2 tabulky) *pro data* + (2 datové stránky +  2 ta
 	- při kopírování jich vypadne 8 (úloha viz prezentace)
 
 ---
+
+citace: [zapisky vitkolos](https://github.com/vitkolos/notes-ipp/blob/main/semestr2/pocitacove-systemy/systemy-prednaska.md),
+[prezentace](https://www.ksi.mff.cuni.cz/teaching/nswi170-web/pages/lectures)
+
