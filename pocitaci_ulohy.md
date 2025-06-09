@@ -30,7 +30,7 @@ takže (3 datové stránky + 2 tabulky) *pro data* + (2 datové stránky +  2 ta
 ---
 - struktura (struct) – vnější a vnitřní zarovnání, počítání offsetu
 - FAT (odpověď: 10, 15)
-- vybrat kód [jak vypada assm](250312.md#jak-vypadá-instrukce:)
+- vybrat kód [jak vypada assm](250312.md#jak-vypadá-instrukce)
 - Jedná se o alokaci souvislých bloků paměti. Máte zadaný typ algoritmu pro alokaci (např. first fit) a sekvenci alokací a dealokací bloků různé velikosti. A otázka pak zní: Na jaké adrese leží nějaký blok na heapu, pokud byl použitý daný algoritmus?
 - page faults
 	- pozor na rozdíl mezi čtením a kopírováním
